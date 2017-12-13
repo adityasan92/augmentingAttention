@@ -1,10 +1,12 @@
 # Augmenting Attention via Bayesian Exploration 
 
-A course project for https://csc2541-f17.github.io. This code build on https://github.com/jtkim-kaist/ram_modified. 
+A course project for https://csc2541-f17.github.io. 
+
+This code is build on https://github.com/jtkim-kaist/ram_modified. 
 
 ## Getting Started
 
-Clone the repo using git clone https://github.com/adityasan92/ram_modified
+Clone the repo using git clone https://github.com/adityasan92/augmentingAttention
 
 There are several prominent hyperparameters in the code, to modify them you need to change variables in the files in the repo. The flags are: 
 1.	translateMnist: Value 1 represents non-centered MNIST dataset and value 0 represents centered MNIST dataset. Default value is 1. 
@@ -16,8 +18,28 @@ There are several prominent hyperparameters in the code, to modify them you need
 7.	nGlimpses: The number of glimpses the network should look in the image. The default value is 6
 8.	eval_only: This parameter decides if the network is in training or testing mode. False represents the network is training and true represents the network is testing. Default value is false. 
 
-To run the code with concrete dropout, run the command: python ram_concrete_dropout.py 
-To run the code with other SRT's, run the command: python ram_srt.py 
+To run the code with concrete dropout, run the command: 
+```
+python ram_concrete_dropout.py
+```
+ 
+To run the code with other SRT's, run the command:  
+
+```
+python python ram_srt.py
+```
+
+To run the orginal RAM code from https://github.com/jtkim-kaist/ram_modified :  
+
+```
+python python ram_modified.py
+```
+
+To run the orginal RAM code, which we modified slightly:  
+
+```
+python python ram_vanilla.py
+```
 
 To do data analysis, you can use the parsers in the folder ./data_analysis. 
 
@@ -43,6 +65,6 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## Acknowledgments
 
-* **We Modified the code present in the repo: https://github.com/jtkim-kaist/ram_modified.**
+* **We modified the code present in the repo: https://github.com/jtkim-kaist/ram_modified.**
 * Inspirations: https://papers.nips.cc/paper/5542-recurrent-models-of-visual-attention.pdf, https://arxiv.org/pdf/1605.09674.pdf, https://authors.library.caltech.edu/13793/1/MACnc92b.pdf, http://www.cs.ox.ac.uk/people/yarin.gal/website/blog_2248.html
 
