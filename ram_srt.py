@@ -202,7 +202,6 @@ def get_glimpse(loc):
 
 def get_next_input(output,flag_save):
     # the next location is computed by the location network
-    # timesteps.
     core_net_out = tf.stop_gradient(output)
 
     # baseline = tf.sigmoid(tf.matmul(core_net_out, Wb_h_b) + Bb_h_b)
@@ -225,7 +224,6 @@ def get_next_input(output,flag_save):
     sample_loc = tf.maximum(-1.0, tf.minimum(1.0, mean_loc + tf.random_normal(mean_loc.get_shape(), 0, loc_sd)))
 
     # don't propagate throught the locations
-    # affecting anything beyond the theta_l box? Seems like why they do it.
     sample_loc = tf.stop_gradient(sample_loc)
     if flag_save: sampled_locs.append(sample_loc)
 
@@ -284,7 +282,7 @@ def model():
             with tf.variable_scope("coreNetwork", reuse=REUSE):
                 # the next hidden state is a function of the previous hidden state and the current glimpse
                 pre_hidden = tf.matmul(hiddenState_prev, Wc_h_h) + Bc_h_h
-                #Apply SRT maps accross the weight for input to hidden and hidden to hidden 
+                # Apply SRT maps accross the weight for input to hidden and hidden to hidden 
                 dropout_pre_hidden = tf.multiply(noise_hidden,pre_hidden)
                 glimpse_input = (tf.matmul(glimpse, Wc_g_h) + Bc_g_h)
                 dropout_glimpse_input = tf.multiply(noise_input,glimpse_input)s 

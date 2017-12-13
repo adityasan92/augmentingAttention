@@ -33,8 +33,6 @@ if len(sys.argv) == 2:
     imgsFolderName = "imgs/" + simulationName + "/"
     if os.path.isdir(summaryFolderName) == False:
         os.mkdir(summaryFolderName)
-    # if os.path.isdir(imgsFolderName) == False:
-    #     os.mkdir(imgsFolderName)
     accFile = simulationName + '-accuracies.log'
     dropoutHiddenFile = simulationName + '-hiddenProbs.log'
     dropoutInputFile = simulationName + '-inputProbs.log'
@@ -179,6 +177,7 @@ def glimpseSensor(img, normLoc):
 
     return zooms
 
+# apply concrete dropout 
 def concrete_dropout(x, dropout_prob_unclipped):
         dropout_prob_unclipped = tf.stack([dropout_prob_unclipped] * 5,axis=2)
         eps = 1e-7
@@ -217,8 +216,6 @@ def get_glimpse(loc):
 
 def get_next_input(output,flag_save):
     # the next location is computed by the location network
-    # TODO: (GW) interesting to see here that they don't backprop to diff
-    # timesteps.
     core_net_out = tf.stop_gradient(output)
 
     # baseline = tf.sigmoid(tf.matmul(core_net_out, Wb_h_b) + Bb_h_b)
@@ -228,7 +225,6 @@ def get_next_input(output,flag_save):
     # compute the next location, then impose noise
     if eyeCentered:
         # add the last sampled glimpse location
-        # TODO max(-1, min(1, u + N(output, sigma) + prevLoc))
         mean_loc = tf.maximum(-1.0, tf.minimum(1.0, tf.matmul(core_net_out, Wl_h_l) + sampled_locs[-1] ))
     else:
         # mean_loc = tf.clip_by_value(tf.matmul(core_net_out, Wl_h_l) + Bl_h_l, -1, 1)
@@ -242,21 +238,10 @@ def get_next_input(output,flag_save):
     sample_loc = tf.maximum(-1.0, tf.minimum(1.0, mean_loc + tf.random_normal(mean_loc.get_shape(), 0, loc_sd)))
 
     # don't propagate throught the locations
-    # TODO: (GW) do they put a stop grad here to stop REINFORCE signal from
-    # affecting anything beyond the theta_l box? Seems like why they do it.
     sample_loc = tf.stop_gradient(sample_loc)
     if flag_save: sampled_locs.append(sample_loc)
 
     return sample_loc
-
-def affineTransform(x,output_dim):
-    """
-    affine transformation Wx+b
-    assumes x.shape = (batch_size, num_features)
-    """
-    w=tf.get_variable("w", [x.get_shape()[1], output_dim])
-    b=tf.get_variable("b", [output_dim], initializer=tf.constant_initializer(0.0))
-    return tf.matmul(x,w)+b
 
 
 def model():
@@ -279,16 +264,13 @@ def model():
     glimpse = initial_glimpse
     REUSE = None
 
-#    dropout_input_mask =  tf.cast(
-#        tf.contrib.distributions.Bernoulli(tf.constant(np.ones((1,g_size,noOfForwardPasses)) * dropout_prob )).sample(), tf.float32)
-#    dropout_hidden_mask =  tf.cast(
-#        tf.contrib.distributions.Bernoulli(tf.constant(np.ones((1,cell_size,noOfForwardPasses)) * dropout_prob)).sample(), tf.float32)
+    # Get concrete dropout masks 
     dropout_hidden_mask = concrete_dropout(tf.cast(tf.constant(np.ones((1,cell_size,noOfForwardPasses))), tf.float32), dropout_probability_hidden) 
     dropout_input_mask = concrete_dropout(tf.cast(tf.constant(np.ones((1,g_size,noOfForwardPasses))), tf.float32), dropout_probability_input) 
-    ### TODO dropout prob needs to be a tensor, with different values for each weight!!!!!!!!!
     variances_locations = []
-    tau = tf.constant(1.0)  #tf.cast( (1.0 - dropout_probability)*np.ones(batch_size), tf.float32)
-    # TODO: Create use dropout with seed 
+    tau = tf.constant(1.0)  
+
+    # look at the images with several glimpses  
     for t in range(nGlimpses):
         if t == 0:  # initialize the hidden state to be the zero vector
             hiddenState_prev = tf.zeros((batch_size, cell_size))
@@ -296,68 +278,47 @@ def model():
             hiddenState_prev = outputs[t-1]
         
         forward_loc = []
+
+        # Get the variance by doing stochastic forward passes
         for forwardpass in range(noOfForwardPasses):
             # forward prop
             noise_input = tf.squeeze(tf.slice(dropout_input_mask,[0,0,forwardpass],[1,g_size, 1]),[2])
             noise_hidden = tf.squeeze(tf.slice(dropout_hidden_mask,[0,0,forwardpass],[1,cell_size, 1]),[2])
             with tf.variable_scope("coreNetwork", reuse=REUSE):
                 # the next hidden state is a function of the previous hidden state and the current glimpse
-                # TODO: (gw) why didn't they just define the affine Transform
-                # weights below and not use the REUSE flag?
-                #hiddenState = tf.nn.relu(affineTransform(hiddenState_prev, cell_size) + (tf.matmul(glimpse, Wc_g_h) + Bc_g_h))
                 pre_hidden = tf.matmul(hiddenState_prev, Wc_h_h) + Bc_h_h
-                #print(pre_hidden.get_shape().as_list(),"pre hidden state shape")
+                # Apply SRT maps accross the weight for input to hidden and hidden to hidden
                 dropout_pre_hidden = tf.multiply(noise_hidden,pre_hidden)
                 glimpse_input = (tf.matmul(glimpse, Wc_g_h) + Bc_g_h)
-                dropout_glimpse_input = tf.multiply(noise_input,glimpse_input) #concrete_dropout(glimpse_input, dropout_probability_input)
-                # print(glimpse_input.get_shape().as_list())
-                # print(dropout_glimpse_input.get_shape().as_list())
-                # TODO: Same dropout map for hidden state changes 
-                # TODO: Same dropout map for glimpse_input changes 
+                dropout_glimpse_input = tf.multiply(noise_input,glimpse_input) 
                 hiddenState = tf.nn.relu(dropout_pre_hidden + dropout_glimpse_input)
             flag_to_save = (forwardpass == noOfForwardPasses - 1) and (t != nGlimpses - 1)    
             loc = get_next_input(hiddenState, flag_to_save)
-            #next_location_passes.append(loc)
             forward_loc.append(loc)
-            # print(next_location_passes)
             REUSE = True  # share variables for later recurrence
         
-        # Save variances
+        # Save variances and calculate the final reward 
         tensor_locs = tf.stack(forward_loc)
-        print(tensor_locs.get_shape().as_list(),"tensor_loc")
         mean, variances = tf.nn.moments(tensor_locs,[0])
         xs = tensor_locs[:,:,0]
         ys = tensor_locs[:,:,1]
         cov_xy = 1 / (tf.cast(tf.shape(xs)[0],tf.float32)) * tf.reduce_sum( (xs - tf.reduce_mean(xs, 0)) * (ys - tf.reduce_mean(ys, 0)), 0)
-        #print(mean.get_shape().as_list(),"means")
-        print(variances.get_shape().as_list(),"variances")
-        #total_variance =  tf.reduce_mean(variances, axis=1) + tau
         final_reward = eta*tf.log( tf.multiply( variances[:,0]+tau, variances[:,1]+tau ) - tf.multiply( cov_xy, cov_xy ) ) 
-        #print(total_variance.get_shape().as_list(),"total variance")
-        variances_locations.append(final_reward) #(total_variance)
+        variances_locations.append(final_reward) 
    
         # save the current glimpse and the hidden state
         inputs[t] = glimpse
         outputs[t] = hiddenState
+
         # get the next input glimpse
         if t != nGlimpses -1:
-            loc = mean #get_next_input(hiddenState)
-            # next_location_passes.append(loc)
-            #print(loc.get_shape().as_list())
-            #def tt():
-            #  return True
-            #res = tf.cond(tf.is_nan(tf.reduce_mean(loc)), tt, lambda: False)
-            
-            #aaa=tf.Print(loc,[loc,"LOC"])
-            #glimpse = get_glimpse(aaa)
+            loc = mean 
             glimpse = get_glimpse(loc)
         else:
             first_hiddenState = tf.stop_gradient(hiddenState)
-            # baseline = tf.sigmoid(tf.matmul(first_hiddenState, Wb_h_b) + Bb_h_b)
             baseline = tf.sigmoid(tf.matmul(first_hiddenState, Wb_h_b) + Bb_h_b)
             baselines.append(baseline)
     
-    #print(str(variances_locations),"variances_locations")
     return outputs,variances_locations
 
 
@@ -385,7 +346,7 @@ def calc_reward(outputs, dropout_reward):
     outputs = tf.reshape(outputs, (batch_size, cell_out_size))
 
     dropout_reward = tf.convert_to_tensor(dropout_reward)
-    print(dropout_reward.get_shape().as_list())
+
     # get the baseline
     b = tf.stack(baselines)
     b = tf.concat(axis=2, values=[b, b])
@@ -403,12 +364,7 @@ def calc_reward(outputs, dropout_reward):
     R = tf.reshape(R, (batch_size, 1))
     R = tf.tile(R, [1, (nGlimpses)*2])
 
-    #r_intrinsic = tf.zeros(R.get_shape().as_list()) # TODO: change this line.
-    # TODO: adit and tristan change from this input
-    #r_int_np = tf.transpose(dropout_reward)  #np.zeros([batch_size,nGlimpses], np.float32)
-    #print(r_int_np.get_shape().as_list())
-    #r_int_np[1, 1] = 1
-    #r_int_np[1, 3] = 1
+    # Calculate the intrinsic reward
     r_intrinsic = tf.transpose(dropout_reward)
 
     R_intrinsic = [tf.zeros([batch_size]) for _ in xrange(nGlimpses)]
@@ -418,13 +374,11 @@ def calc_reward(outputs, dropout_reward):
     R_intrinsic = tf.stack(R_intrinsic, axis=1)
     R_intrinsic = tf.expand_dims(R_intrinsic, 2) # duplicate across x,y
     R_intrinsic = tf.tile(R_intrinsic, [1, 1, 2])
-    #print R_intrinsic.get_shape().as_list()
+    
 
     R_intrinsic = tf.reshape(R_intrinsic, [batch_size, 2*nGlimpses])
-    #sess = tf.Session()
-    #with sess.as_default():
-        #print sess.run(R_intrinsic)
-    #raise ValueError('yo')
+    
+    # Add the intrinsic reward to the total reward if the falg is True 
     if add_intrinsic_reward:
        R += R_intrinsic
     
@@ -433,7 +387,7 @@ def calc_reward(outputs, dropout_reward):
     # get the location
 
     p_loc = gaussian_pdf(mean_locs, sampled_locs)
-    # p_loc = tf.tanh(p_loc)
+
 
     p_loc_orig = p_loc
     p_loc = tf.reshape(p_loc, (batch_size, (nGlimpses) * 2))
@@ -441,21 +395,20 @@ def calc_reward(outputs, dropout_reward):
     # define the cost function
     weight_reg_strength = 0.0001
     reinforce_terms = tf.log(p_loc + SMALL_NUM) * (R-no_grad_b)
-    #J = tf.concat(axis=1, values=[tf.log(p_y + SMALL_NUM) * (onehot_labels_placeholder), tf.log(p_loc + SMALL_NUM) * (R - no_grad_b)])
     J = tf.concat(axis=1, values=[tf.log(p_y + SMALL_NUM) * (onehot_labels_placeholder), reinforce_terms])
     J = tf.reduce_sum(J, 1)
     J = J - tf.reduce_sum(tf.square(R - b), 1)
     J = tf.reduce_mean(J, 0)
+    
+    # Add L2 regularization 
     L2_weight_sums = tf.nn.l2_loss(Wc_h_h) + tf.nn.l2_loss(Bc_h_h) + tf.nn.l2_loss(Wc_g_h) + tf.nn.l2_loss(Bc_g_h)
     cost = -J + weight_reg_strength * L2_weight_sums
     var_list = tf.trainable_variables()
     grads = tf.gradients(cost, var_list)
     grads, _ = tf.clip_by_global_norm(grads, 0.5)
-    # define the optimizer
-    # lr_max = tf.maximum(lr, lr_min)
+   
     optimizer = tf.train.AdamOptimizer(lr)
-    # optimizer = tf.train.MomentumOptimizer(lr, momentumValue)
-    # train_op = optimizer.minimize(cost, global_step)
+    
     train_op = optimizer.apply_gradients(zip(grads, var_list), global_step=global_step)
 
     return cost, reward, max_p_y, correct_y, train_op, b, tf.reduce_mean(b), tf.reduce_mean(R - b), lr, total_reward
@@ -490,6 +443,8 @@ def evaluate(print_acc=True, write_acc=True, epoch=None, writeDropoutProbs=True,
         accuracy += r
 
     accuracy /= batches_in_epoch
+
+    # save to files 
     if print_acc: print(("ACCURACY: " + str(accuracy)))
     if write_acc:
        with open(accFile, 'a') as f:
@@ -683,11 +638,6 @@ with tf.device('/gpu:1'):
             init = tf.global_variables_initializer()
             sess.run(init)
         
-        #b_fetched = np.zeros((batch_size, (nGlimpses)*2))
-
-        #init = tf.global_variables_initializer()
-        #sess.run(init)
-
         if eval_only:
             evaluate()
         else:
@@ -706,38 +656,6 @@ with tf.device('/gpu:1'):
                 txt = fig.suptitle("-", fontsize=36, fontweight='bold')
                 plt.ion()
                 plt.show()
-
-            if preTraining:
-                for epoch_r in range(1,preTraining_epoch):
-                    nextX, _ = dataset.train.next_batch(batch_size)
-                    nextX_orig = nextX
-                    if translateMnist:
-                        nextX, _ = convertTranslated(nextX, MNIST_SIZE, img_size)
-
-                    fetches_r = [reconstructionCost, reconstruction, train_op_r]
-
-                    reconstructionCost_fetched, reconstruction_fetched, train_op_r_fetched = sess.run(fetches_r, feed_dict={inputs_placeholder: nextX})
-
-                    if epoch_r % 20 == 0:
-                        print(('Step %d: reconstructionCost = %.5f' % (epoch_r, reconstructionCost_fetched)))
-                        if epoch_r % 100 == 0:
-                            if drawReconsturction:
-                                fig = plt.figure(2)
-
-                                plt.subplot(1, 2, 1)
-                                plt.imshow(np.reshape(nextX[0, :], [img_size, img_size]),
-                                           cmap=plt.get_cmap('gray'), interpolation="nearest")
-                                plt.ylim((img_size - 1, 0))
-                                plt.xlim((0, img_size - 1))
-
-                                plt.subplot(1, 2, 2)
-                                plt.imshow(np.reshape(reconstruction_fetched[0, :], [img_size, img_size]),
-                                           cmap=plt.get_cmap('gray'), interpolation="nearest")
-                                plt.ylim((img_size - 1, 0))
-                                plt.xlim((0, img_size - 1))
-                                plt.draw()
-                                plt.pause(0.0001)
-                                # plt.show()
 
 
             # Extra check for numerics
@@ -772,14 +690,10 @@ with tf.device('/gpu:1'):
                           % (epoch, cost_fetched, reward_fetched, duration, avg_b_fetched, rminusb_fetched, lr_fetched)))
                     summary_str = sess.run(summary_op, feed_dict=feed_dict)
                     summary_writer.add_summary(summary_str, epoch)
-                    # if saveImgs:
-                    #     plt.savefig(imgsFolderName + simulationName + '_ep%.6d.png' % (epoch))
 
                     if epoch % 500 == 0:
                         saver.save(sess, save_dir + save_prefix + str(epoch) + ".ckpt")
                         print("Dropout reward",str(dropout_reward_fetched), "Total Reward",total_reward_fetched)
-                        #print("dropout_pre_hidden_fetched", str(dropout_probability_hidden_fetched))
-                        #print("dropout_pre_input_fetched", str(dropout_probability_input_fetched))
                         evaluate(epoch=epoch,dropProbHidden=dropout_probability_hidden_fetched,dropProbInput=dropout_probability_input_fetched,dropoutReward=dropout_reward_fetched)
 
                     ##### DRAW WINDOW ################
