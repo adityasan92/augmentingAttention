@@ -1,7 +1,7 @@
 "use strict";
 
 var fs = require('fs');
-var graphLength = 150000;
+var graphLength = 100000;
 
 
 function parseFile(fileName, cb){
@@ -21,13 +21,15 @@ function parseFile(fileName, cb){
             //console.log(typeof(linesParser[i]));
             //console.log(linesParser[i]);
             var datapointParser = linesParser[i].split(',[');
+            if(!datapointParser[1])
+                continue;
             datapointParser[1] = datapointParser[1].replace("array(", '[')
             datapointParser[1] = datapointParser[1].split(' dtype=float32), array(').join('')
             datapointParser[1] = datapointParser[1].split(', dtype=float32)').join('')
             datapointParser[1] = datapointParser[1].split('0.').join('0.0')
             console.log(datapointParser[1]);
             var array = JSON.parse(datapointParser[1]);
-            if(Number(datapointParser[0]) > 150000){
+            if(Number(datapointParser[0]) > 100000){
                 break;
             }
             if(Number(datapointParser[0]) != 0 && Number(datapointParser[1]) !=0){
@@ -49,7 +51,7 @@ function checker(files){
         fs.writeFile('concreteDropout_rewards.json', json, 'utf8');
     }
 }
-var folderName = './ConcreteDropout_Reward/rewards/';
+var folderName = './translated_rewards/rewards/';
 var files = fs.readdirSync(folderName);
 console.log(files);
 var counter = 0; 

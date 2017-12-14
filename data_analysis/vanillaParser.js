@@ -45,7 +45,7 @@ function checker(files){
     }
 }
 
-var folderName = './vanilla/';
+var folderName = './vanilla_untranslated/';
 var files = fs.readdirSync(folderName);
 console.log(files);
 var counter = 0; 

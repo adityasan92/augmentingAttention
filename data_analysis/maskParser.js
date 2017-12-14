@@ -1,7 +1,7 @@
 "use strict";
 
 var fs = require('fs');
-var graphLength = 100000;
+var graphLength = 500000;
 
 
 function parseFile(fileName, cb){
@@ -22,7 +22,7 @@ function parseFile(fileName, cb){
             //console.log(linesParser[i]);
             var datapointParser = linesParser[i].split(',');
             //console.log(datapointParser[1]);
-            if(Number(datapointParser[0]) > 100000){
+            if(Number(datapointParser[0]) > 500000){
                 break;
             }
             if(!datapointParser[1]){
@@ -58,7 +58,7 @@ function checker(files){
         fs.writeFile('mask_input.json', json, 'utf8');
     }
 }
-var folderName = './translated_Masks/input/';
+var folderName = './untranslated_Masks/input/';
 var files = fs.readdirSync(folderName);
 console.log(files);
 var counter = 0; 

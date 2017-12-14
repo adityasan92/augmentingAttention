@@ -38,11 +38,11 @@ function checker(files){
     if(counter > files.length - 1  ){
         console.log(dataMap); 
         var json = JSON.stringify(dataMap);
-        fs.writeFile('concrete_reward_acc.json', json, 'utf8');
+        fs.writeFile('dropout_0.25_no_reward_acc.json', json, 'utf8');
     }
 }
 
-var folderName = './translated_Acc_logs/concrete_reward/';
+var folderName = './untranslated_Acc_logs/dropout_0.25_no_reward/';
 var files = fs.readdirSync(folderName);
 console.log(files);
 var counter = 0; 
