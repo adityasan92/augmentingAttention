@@ -8,10 +8,10 @@ import sys
 import os
 
 ### Parameter Flags for Stochastic Regularization ###
-add_intrinsic_reward = False # True vs False
+add_intrinsic_reward = True # True vs False
 stochastic_regularization_type = 'D' # 'D' = dropout, 'MG' = multiplicative gaussian
 noOfForwardPasses = 5 # Leave as 5
-dropout_prob = 0.75 # One of [0.25, 0.5, 0.75]
+dropout_prob = 0.25 # One of [0.25, 0.5, 0.75]
 translateMnist = 1 # 0 or 1
 eta = 4.0
 
@@ -285,7 +285,7 @@ def model():
                 # Apply SRT maps accross the weight for input to hidden and hidden to hidden 
                 dropout_pre_hidden = tf.multiply(noise_hidden,pre_hidden)
                 glimpse_input = (tf.matmul(glimpse, Wc_g_h) + Bc_g_h)
-                dropout_glimpse_input = tf.multiply(noise_input,glimpse_input)s 
+                dropout_glimpse_input = tf.multiply(noise_input,glimpse_input)
                 hiddenState = tf.nn.relu(dropout_pre_hidden + dropout_glimpse_input)
             flag_to_save = (forwardpass == noOfForwardPasses - 1) and (t != nGlimpses - 1)    
             loc = get_next_input(hiddenState, flag_to_save)

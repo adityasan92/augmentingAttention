@@ -5,12 +5,12 @@ for ((i=0; i<=2; i++)); do
    ### To reproduce, change the script parameters accordingly and uncomment the corresponding line ###
    ###################################################################################################
    
-   #nohup python ram_vanilla_new.py vanilla_new_$i >> vn_$i.log &   
-   #nohup python ram_srt_new.py dropout_0d75_noReward_new_$i >> d0d75_nr_$i.log &   
-   #nohup python ram_srt_new.py dropout_0d25_noReward_new_$i >> d0d25_nr_$i.log &   
-   #nohup python ram_srt_new.py dropout_0d25_reward_new_$i >> d0d25_pr_$i.log &   
-   #nohup python ram_srt_new.py dropout_0d75_reward_new_$i >> d0d75_pr_$i.log &   
-   nohup python ram_concrete_dropout_new.py concrete_reward_new_$i >> conc_r_$i.log &
+   #nohup python ram_vanilla.py vanilla_new_$i >> vn_$i.log &   
+   #nohup python ram_srt.py dropout_0d75_noReward_new_$i >> d0d75_nr_$i.log &   
+   #nohup python ram_srt.py dropout_0d25_noReward_new_$i >> d0d25_nr_$i.log &   
+   #nohup python ram_srt.py dropout_0d25_reward_new_$i >> d0d25_pr_$i.log &   
+   #nohup python ram_srt.py dropout_0d75_reward_new_$i >> d0d75_pr_$i.log &   
+   nohup python ram_concrete_dropout.py concrete_reward_new_$i >> conc_r_$i.log &
 
 
    #nohup python ram_srt.py dropout_0d25_plusReward_eta4_$i >> d0d25pre4_$i.log &   

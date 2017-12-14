@@ -6,7 +6,7 @@ import time
 import random
 import sys, os
 
-add_intrinsic_reward = False
+add_intrinsic_reward = True
 translateMnist = 1
 eta = 4.0
 

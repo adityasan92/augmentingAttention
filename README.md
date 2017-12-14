@@ -20,13 +20,13 @@ There are several prominent hyperparameters in the code, to modify them you need
 
 To run the code with concrete dropout, run the command: 
 ```
-python ram_concrete_dropout.py
+python ram_concrete_dropout.py logFileName
 ```
  
 To run the code with other SRT's, run the command:  
 
 ```
-python python ram_srt.py
+python python ram_srt.py logFileName
 ```
 
 To run the orginal RAM code from https://github.com/jtkim-kaist/ram_modified :  
@@ -56,9 +56,8 @@ Install the following:
 
 ## Authors
 
-* **Aditya Sanghi** 
-* **Tristian**
-
+* **Aditya Sanghi (aditya.sanghi@mail.utoronto.ca)**
+* **Tristan Aumentado-Armstrong (tristan.aumentado@mail.utoronto.ca)**
 ## Acknowledgments
 
 * **We modified the code present in the repo: https://github.com/jtkim-kaist/ram_modified.**
